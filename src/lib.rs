@@ -6,12 +6,13 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-#![feature(env, fs, io, old_io, old_path, path)]
+#![feature(env, fs, io, old_io, old_path, path, os, std_misc)]
 
 extern crate rand;
 
 use rand::Rng;
 use std::path::{Path, PathBuf};
+use std::ffi::{OsString, AsOsStr, OsStr};
 use std::old_io;
 use std::env;
 use std::fs;
@@ -171,7 +172,9 @@ impl TempDir {
     /// deleted once the returned wrapper is destroyed.
     ///
     /// If no directory can be created, `Err` is returned.
-    pub fn new(prefix: &str) -> io::Result<TempDir> {
+    pub fn new<P: ?Sized>(prefix: &P) -> io::Result<TempDir>
+        where P: AsOsStr
+    {
         TempDir::new_in(&temp_dir(), prefix)
     }
 
@@ -180,7 +183,9 @@ impl TempDir {
     /// deleted once the returned wrapper is destroyed.
     ///
     /// If no directory can be created, `Err` is returned.
-    pub fn new_in(tmpdir: &Path, prefix: &str) -> io::Result<TempDir> {
+    pub fn new_in<P: ?Sized>(tmpdir: &Path, prefix: &P) -> io::Result<TempDir>
+        where P: AsOsStr
+    {
         if tmpdir.is_relative() {
             let cur_dir: old_path::Path = match env::current_dir() {
                 Err(err) => return Err(to_new_error(err)),
@@ -193,13 +198,17 @@ impl TempDir {
         let mut rng = rand::thread_rng();
         for _ in 0..NUM_RETRIES {
             let suffix: String = rng.gen_ascii_chars().take(NUM_RAND_CHARS).collect();
-            let leaf: String = if prefix.len() > 0 {
-                format!("{}.{}", prefix, suffix)
+            let leaf: OsString = if prefix.as_os_str() != OsStr::from_str("") {
+                let mut s = OsString::new();
+                s.push_os_str(prefix.as_os_str());
+                s.push_os_str(OsStr::from_str("."));
+                s.push_os_str(suffix.as_os_str());
+                s
             } else {
                 // If we're given an empty string for a prefix, then creating a
                 // directory starting with "." would lead to it being
                 // semi-invisible on some systems.
-                suffix
+                suffix.as_os_str().to_os_string()
             };
             let path: PathBuf = tmpdir.join(&leaf);
             match fs::create_dir(&path) {
