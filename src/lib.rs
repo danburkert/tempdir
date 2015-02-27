@@ -6,18 +6,16 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-#![feature(env, fs, io, old_io, old_path, path, os, std_misc)]
+#![feature(env, fs, io, path, os, std_misc)]
 
 extern crate rand;
 
 use rand::Rng;
 use std::path::{Path, PathBuf};
 use std::ffi::{OsString, AsOsStr, OsStr};
-use std::old_io;
 use std::env;
 use std::fs;
 use std::io;
-use std::old_path;
 
 /// Returns the path to a temporary directory.
 ///
@@ -63,39 +61,6 @@ pub fn temp_dir() -> PathBuf {
     }
 
     lookup()
-}
-
-// TODO: this can be removed once std::env::current_dir returns the new Result type
-fn to_new_error(error: old_io::IoError) -> io::Error {
-
-    fn to_new_error_kind(kind: &old_io::IoErrorKind) -> io::ErrorKind {
-        match *kind {
-            old_io::IoErrorKind::OtherIoError => io::ErrorKind::Other,
-            old_io::IoErrorKind::EndOfFile => io::ErrorKind::Other,
-            old_io::IoErrorKind::FileNotFound => io::ErrorKind::FileNotFound,
-            old_io::IoErrorKind::PermissionDenied => io::ErrorKind::PermissionDenied,
-            old_io::IoErrorKind::ConnectionFailed => io::ErrorKind::Other,
-            old_io::IoErrorKind::Closed => io::ErrorKind::Other,
-            old_io::IoErrorKind::ConnectionRefused => io::ErrorKind::ConnectionRefused,
-            old_io::IoErrorKind::ConnectionReset => io::ErrorKind::ConnectionReset,
-            old_io::IoErrorKind::ConnectionAborted => io::ErrorKind::ConnectionAborted,
-            old_io::IoErrorKind::NotConnected => io::ErrorKind::NotConnected,
-            old_io::IoErrorKind::BrokenPipe => io::ErrorKind::BrokenPipe,
-            old_io::IoErrorKind::PathAlreadyExists => io::ErrorKind::PathAlreadyExists,
-            old_io::IoErrorKind::PathDoesntExist => io::ErrorKind::PathDoesntExist,
-            old_io::IoErrorKind::MismatchedFileTypeForOperation => io::ErrorKind::MismatchedFileTypeForOperation,
-            old_io::IoErrorKind::ResourceUnavailable => io::ErrorKind::ResourceUnavailable,
-            old_io::IoErrorKind::IoUnavailable => io::ErrorKind::Other,
-            old_io::IoErrorKind::InvalidInput => io::ErrorKind::InvalidInput,
-            old_io::IoErrorKind::TimedOut => io::ErrorKind::TimedOut,
-            old_io::IoErrorKind::ShortWrite(_) => io::ErrorKind::Other,
-            old_io::IoErrorKind::NoProgress => io::ErrorKind::Other,
-        }
-    }
-
-    match error {
-        old_io::IoError { kind, desc, detail } => io::Error::new(to_new_error_kind(&kind), desc, detail)
-    }
 }
 
 /// A wrapper for a path to temporary directory implementing automatic
@@ -187,11 +152,7 @@ impl TempDir {
         where P: AsOsStr
     {
         if tmpdir.is_relative() {
-            let cur_dir: old_path::Path = match env::current_dir() {
-                Err(err) => return Err(to_new_error(err)),
-                Ok(path) => path,
-            };
-            let cur_dir: &Path = Path::new(&cur_dir);
+            let cur_dir = try!(env::current_dir());
             return TempDir::new_in(&cur_dir.join(tmpdir), prefix);
         }
 
